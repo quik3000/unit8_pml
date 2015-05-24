@@ -1,0 +1,104 @@
+# Practical Machine Learning Course Project
+
+<br/>
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now possible to collect a large amount of data about personal activity relatively inexpensively. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Data source: <http://groupware.les.inf.puc-rio.br/har>
+
+The goal of this project is to predict the manner in which they did the exercise (refer to "classe" variable in the data set). After building the prediction model, it will be used to predict 20 different test cases which are provided as part of the assignment.
+
+<br/>
+
+## Data Preparation & Processing
+
+Download the "training" and "testing" data sets to the working directory.
+
+Firstly, we read the "training data" from the raw csv file "pml-training.csv". 
+
+```{r, results = "hide"}
+train_data <- read.csv("pml-training.csv", na.strings= c("NA","","#DIV/0!"))
+summary(train_data)
+```
+
+Then, we remove columns that contain NA values from the data set, as well as the first 7 columns (eg. user IDs, timestamps and other non-measurements) which are not required for this analysis.
+
+```{r, warning = F, message = F}
+NA_columns <- apply(train_data, 2, function(x) {sum(is.na(x))})
+clean_data <- train_data[, which(NA_columns == 0)]
+library(dplyr)
+clean_data <- select(clean_data, -(X:num_window))
+```
+
+Using the cleaned data set "clean_data", we split it into training set (60%) and testing set (40%) by "classe" variable. This will allow us to perform cross-validation of the prediction model later part of the project.
+
+```{r, warning = F, message = F}
+library(caret)
+set.seed(888)
+in_Train <- createDataPartition(y = clean_data$classe, p = 0.6, list = FALSE)
+training <- clean_data[in_Train, ]
+testing <- clean_data[-in_Train, ]
+dim(training); dim(testing)
+```
+
+<br/>
+
+## Exploratory Data Analysis
+
+Next, we check for "near zero variance" predictors. If found, they should be removed from the training set.
+
+```{r}
+near_zero_var <- nearZeroVar(training, saveMetrics=TRUE)
+near_zero_var
+```
+
+From the results above, we note that there is no variable with near zero variance.
+
+<br/>
+
+## Training The Prediction Model
+
+"Random Forests" method was chosen because of its high level of accuracy among current algorithms. It also runs efficiently on large database and is able to handle large number of input variables.
+
+
+```{r, warning = F, message = F}
+library(randomForest)
+set.seed(2222)
+modelFit <- randomForest(classe ~ ., data = training)
+modelFit
+```
+
+Since, this prediction model has a very small OOB estimate error rate of 0.66%, we would expect the **out of sample error** to be greater than 0.66%. The Out of Sample Error can be estimated with cross-validation approach which is detailed below. 
+
+<br/>
+
+## Cross Validation
+
+To evaluate the prediction model, we apply the model to the testing set, and the predictions are then compared with the actual reference value.
+
+```{r}
+prediction <- predict(modelFit, newdata = testing)
+confusionMatrix(prediction, testing$classe)
+```
+
+Since the prediction model is fairly accurate, 0.9944 as per table above, we can proceed to predict the 20 different test cases provided in the file "pml-testing.csv".
+
+<br/>
+
+## Predictions For The 20 Test Cases
+
+We read the "testing" data from the raw csv file "pml-testing.csv", and apply the model to get the predictions.
+
+```{r}
+testcases <- read.csv("pml-testing.csv", na.strings= c("NA","","#DIV/0!"))
+predict_testcases <- predict(modelFit, newdata = testcases)
+```
+
+The predictions are submitted in the appropriate format to the programming assignment for automated grading, and all 20 test cases are marked as correct.
+
+<br/>
+
+## The End
+
